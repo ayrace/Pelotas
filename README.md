@@ -13,3 +13,9 @@ Envie a nova exportação do XPERTrack para a pasta `data/`, mantendo no nome `I
 
 ## Publicação
 No Streamlit Community Cloud, selecione este repositório, branch `main` e arquivo principal `streamlit_app.py`.
+
+
+## Atualização V2
+- Identidade visual corrigida para Pelotas.
+- Classificação geográfica inicial preenchida pelas regiões administrativas oficiais de Pelotas.
+- Bairro/Região é provisório quando derivado da posição; pode ser refinado sem alterar a lógica do mapa.

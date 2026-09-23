@@ -87,7 +87,7 @@ LOCATION_ANCHOR_OVERRIDES = {
 # Origem/HUB confirmados pelo usuário. Internamente mantemos as chaves já usadas no painel.
 ORIGIN_OVERRIDES = {}
 
-# Bairro/localidade confirmados para nodes fora do recorte de bairros de Porto Alegre.
+# Bairro/localidade confirmados para nodes fora do recorte geográfico principal.
 NEIGHBORHOOD_OVERRIDES = {}
 
 LIGHT_MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
@@ -482,7 +482,7 @@ def build_operational_status(xdf: pd.DataFrame):
 
 
 # -----------------------------
-# Bairro oficial — GIS Prefeitura de Porto Alegre
+# Bairro/região administrativa — base geográfica de Pelotas
 # -----------------------------
 BAIRROS_API = ""  # Pelotas: bairros serão cadastrados/validados na base própria
 
@@ -1165,7 +1165,7 @@ def _snapshot_row(datahora, outages_value, tipo, source_key="", observacao=""):
 
 
 def _history_datetime_local(row):
-    """Converte o horário histórico para Porto Alegre sem deslocar registros novos.
+    """Converte o horário histórico para o fuso local sem deslocar registros novos.
 
     Registros novos trazem Fuso=America/Sao_Paulo. Em registros legados sem
     marcador, corrigimos automaticamente os casos claramente gravados em UTC
@@ -1308,7 +1308,7 @@ header_warn = f' • sem atualização há <b>{int(age_min)} min</b>' if is_stal
 st.markdown(
     f'<div class="topbar">'
     f'<div class="title-wrap">'
-    f'<h1>Mapa de Nodes HFC – Porto Alegre</h1>'
+    f'<h1>Mapa de Nodes HFC – Pelotas</h1>'
     f'<div class="sub">XPERTrack • Pontuação por porta</div>'
     f'<div class="header-meta">Fonte XPERTrack: {esc(updated_txt)}{header_warn}' + (f' • arquivo: {esc(source_file_name)}' if source_file_name else '') + '</div>'
     f'</div></div>',
@@ -1785,7 +1785,7 @@ if view=="Executiva":
         render_top_nodes(show_treatment=False,limit=6)
 
     # Mapa ocupa toda a largura disponível.
-    st.markdown('<div class="panel-title" style="margin-top:10px"><b>🗺️ Porto Alegre – RS</b><span>Rede HFC • todos os nodes</span></div>',unsafe_allow_html=True)
+    st.markdown('<div class="panel-title" style="margin-top:10px"><b>🗺️ Pelotas – RS</b><span>Rede HFC • todos os nodes</span></div>',unsafe_allow_html=True)
     render_map_search(); render_legend(); render_map(height=650)
     if crisis_mode: st.error(f"⚡ MODO CRISE ATIVO — {fmt_int(ports_off or 0)} portas OFF.")
 
