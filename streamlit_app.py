@@ -22,6 +22,7 @@ import pydeck as pdk
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+import time
 
 st.set_page_config(
     page_title="Painel Geográfico de Nodes — Pelotas",
@@ -435,16 +436,16 @@ def fetch_remote_bytes(url: str, token: str=""):
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def fetch_public_drive_collection():
+def fetch_public_drive_collection(cache_minute: int):
     """Lê Pelotas.csv da pasta pública.
 
     Primeiro tenta descobrir o ID atual pelo conteúdo público da pasta, permitindo
     trocar o arquivo mantendo o mesmo nome. Se o Google mudar o HTML da pasta,
     usa como fallback o ID do arquivo validado em 23/09/2026.
     """
-    headers={"User-Agent":"Mozilla/5.0 Painel-Nodes-Pelotas/1.0"}
+    headers={"User-Agent":"Mozilla/5.0 Painel-Nodes-Pelotas/1.0","Cache-Control":"no-cache, no-store, max-age=0","Pragma":"no-cache"}
     file_id=DRIVE_FILE_ID_FALLBACK
-    folder_url=f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}?usp=sharing"
+    folder_url=f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}?usp=sharing&_cb={cache_minute}"
     try:
         fr=requests.get(folder_url,headers=headers,timeout=25)
         fr.raise_for_status()
@@ -458,13 +459,13 @@ def fetch_public_drive_collection():
             # IDs de arquivos do Drive costumam aparecer próximos ao nome; testa
             # candidatos até encontrar um CSV com o cabeçalho esperado.
             for cand in ids:
-                u=f"https://drive.google.com/uc?export=download&id={cand}"
+                u=f"https://drive.google.com/uc?export=download&id={cand}&_cb={cache_minute}"
                 rr=requests.get(u,headers=headers,timeout=20)
                 if rr.ok and b"Node" in rr.content[:500] and (b"Pontua" in rr.content[:500] or b"Pontua" in rr.content[:1000]):
                     file_id=cand; break
     except Exception:
         pass
-    url=f"https://drive.google.com/uc?export=download&id={file_id}"
+    url=f"https://drive.google.com/uc?export=download&id={file_id}&_cb={cache_minute}"
     r=requests.get(url,headers=headers,timeout=35)
     r.raise_for_status()
     if b"Node" not in r.content[:1000]:
@@ -998,7 +999,8 @@ xraw=None; source_updated_at=None; source_file_name=""
 # Pelotas segue o mesmo fluxo operacional validado: a base geográfica fica no
 # GitHub e somente a coleta XPERTrack é substituída manualmente no Drive.
 try:
-    raw,last_mod,drive_file_id=fetch_public_drive_collection()
+    drive_cache_minute=int(time.time() // 60)
+    raw,last_mod,drive_file_id=fetch_public_drive_collection(drive_cache_minute)
     xraw=load_table_bytes(raw,DRIVE_FILE_NAME)
     source_file_name=DRIVE_FILE_NAME
     if last_mod:
@@ -1808,7 +1810,7 @@ if view=="Executiva":
     render_map_search(); render_legend(); render_map(height=650)
     if crisis_mode: st.error(f"⚡ MODO CRISE ATIVO — {fmt_int(ports_off or 0)} portas OFF.")
 
-    st.markdown('<div class="footer-version" style="text-align:center;color:#7a879c;font-size:10px;margin-top:12px">v10.2 • Pelotas Drive</div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer-version" style="text-align:center;color:#7a879c;font-size:10px;margin-top:12px">PEL V9 • Drive no-cache</div>', unsafe_allow_html=True)
 
 # -----------------------------
 # VISÃO SUPERVISOR
