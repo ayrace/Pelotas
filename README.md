@@ -21,3 +21,7 @@ Suba os arquivos deste pacote na raiz do repositório, preservando a pasta `data
 - TRVAI consolidado em TRVAIA (portas 1, 2, 3 e 4); TRVAI não aparece como node separado.
 - CRZAA consolidado em CRZAAA (portas 1, 2, 3 e 4); CRZAA não aparece como node separado.
 - STRAC consolidado em STRACA; STRAC não aparece como node separado.
+
+
+## V5 — correções de cadastro
+Excluídos do mapa/base geográfica: STRABD, STRABN e AREBC.
