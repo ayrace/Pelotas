@@ -24,4 +24,4 @@ Suba os arquivos deste pacote na raiz do repositório, preservando a pasta `data
 
 
 ## V5 — correções de cadastro
-Excluídos do mapa/base geográfica: STRABD, STRABN e AREBC.
+Excluídos tanto da base geográfica quanto da camada lógica XPERTrack: STRABD, STRABN e AREBC. Isso impede que sejam recriados automaticamente pelo cruzamento de nomes.
