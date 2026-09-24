@@ -14,3 +14,10 @@ O app tenta localizar pelo nome `Pelotas.csv` dentro da pasta pública. Como con
 ## GitHub / Streamlit
 
 Suba os arquivos deste pacote na raiz do repositório, preservando a pasta `data/`. O Streamlit usa `streamlit_app.py` como arquivo principal.
+
+
+## Validações de cadastro — 23/09/2026
+- Excluídos do mapa: FGTAM, FGTAG e CNTAD.
+- TRVAI consolidado em TRVAIA (portas 1, 2, 3 e 4); TRVAI não aparece como node separado.
+- CRZAA consolidado em CRZAAA (portas 1, 2, 3 e 4); CRZAA não aparece como node separado.
+- STRAC consolidado em STRACA; STRAC não aparece como node separado.
