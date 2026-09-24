@@ -31,3 +31,8 @@ Excluídos do mapa/base geográfica: STRABD, STRABN e AREBC.
 - STRABD e STRABN removidos somente da base fixa do mapa.
 - Âncora geográfica TVRAIA corrigida para TRVAIA.
 - TRVAIA-1, TRVAIA-2, TRVAIA-3 e TRVAIA-4 passam a cruzar diretamente com o node TRVAIA da base fixa.
+
+
+## V8 — correções cadastrais
+- STRBD removido da base fixa, bairros e regiões.
+- STRBN removido da base fixa, bairros e regiões.
