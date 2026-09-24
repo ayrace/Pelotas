@@ -60,7 +60,7 @@ PHOTO_DIR = DATA_DIR / "fotos_atendimento"
 # Ajustes operacionais validados em campo.
 # Os nomes antigos permanecem disponíveis apenas como âncoras geográficas quando necessário,
 # mas não aparecem como nodes ativos no mapa, busca ou indicadores.
-RETIRED_NODES = {"FGTAM", "FGTAG", "CNTAD", "TRVAI", "CRZAA", "STRAC", "STRABD", "STRABN", "AREBC"}
+RETIRED_NODES = {"FGTAM", "FGTAG", "CNTAD", "TRVAI", "CRZAA", "STRAC"}
 
 # Nodes UNI não possuem coleta no XPERTrack por definição. Eles permanecem no mapa,
 # mas não devem ser tratados como falha/ausência de leitura.

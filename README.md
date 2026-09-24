@@ -24,4 +24,10 @@ Suba os arquivos deste pacote na raiz do repositório, preservando a pasta `data
 
 
 ## V5 — correções de cadastro
-Excluídos tanto da base geográfica quanto da camada lógica XPERTrack: STRABD, STRABN e AREBC. Isso impede que sejam recriados automaticamente pelo cruzamento de nomes.
+Excluídos do mapa/base geográfica: STRABD, STRABN e AREBC.
+
+
+## V7 — correção cadastral
+- STRABD e STRABN removidos somente da base fixa do mapa.
+- Âncora geográfica TVRAIA corrigida para TRVAIA.
+- TRVAIA-1, TRVAIA-2, TRVAIA-3 e TRVAIA-4 passam a cruzar diretamente com o node TRVAIA da base fixa.
