@@ -1,21 +1,16 @@
-# Mapa Sem Sinal HFC — Pelotas
+# Mapa de Nodes HFC — Pelotas
 
-Clone funcional do painel de Porto Alegre, com a base geográfica HFC de Pelotas.
+Versão operacional baseada no painel de Porto Alegre, adaptada para Pelotas.
 
 ## Atualização diária
-Envie a nova exportação do XPERTrack para a pasta `data/`, mantendo no nome `Integridade atual de Node` (CSV/XLSX/XLS). O painel escolhe automaticamente a coleta diária mais recente.
 
-## Base fixa
-`base_nodes_pelotas.csv` contém os 94 pontos HFC extraídos do KMZ `RS - PELOTAS - 01.04.2026.kmz`. GPON foi excluído.
+A base geográfica, bairros/regiões, aliases e regras ficam neste repositório.
+A única informação atualizada manualmente é a coleta do XPERTrack `Pelotas.csv`, na pasta pública do Google Drive definida no app.
 
-## Variações de nomenclatura
-`data/cruzamento_variantes_recuperadas.csv` associa derivações lógicas do XPERTrack a uma posição física do KMZ sem fundir a identidade do node. Novos casos podem ser acrescentados em `data/cruzamento_manual.csv`.
+Fluxo: XPERTrack → substituir `Pelotas.csv` no Drive → recarregar o Streamlit.
 
-## Publicação
-No Streamlit Community Cloud, selecione este repositório, branch `main` e arquivo principal `streamlit_app.py`.
+O app tenta localizar pelo nome `Pelotas.csv` dentro da pasta pública. Como contingência, mantém o ID do arquivo validado em 23/09/2026. Não é necessário subir a coleta no GitHub.
 
+## GitHub / Streamlit
 
-## Atualização V2
-- Identidade visual corrigida para Pelotas.
-- Classificação geográfica inicial preenchida pelas regiões administrativas oficiais de Pelotas.
-- Bairro/Região é provisório quando derivado da posição; pode ser refinado sem alterar a lógica do mapa.
+Suba os arquivos deste pacote na raiz do repositório, preservando a pasta `data/`. O Streamlit usa `streamlit_app.py` como arquivo principal.

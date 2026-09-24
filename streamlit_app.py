@@ -31,16 +31,21 @@ st.set_page_config(
 )
 
 ROOT = Path(__file__).resolve().parent
-POA_TZ = ZoneInfo("America/Sao_Paulo")
+LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
 
-def now_poa():
-    return datetime.now(POA_TZ)
+def now_local():
+    return datetime.now(LOCAL_TZ)
 
 BASE = ROOT / "base_nodes_pelotas.csv"
 CONFIG = ROOT / "config_status.json"
 DATA_DIR = ROOT / "data"
-LOCAL_XLSX = DATA_DIR / "xpertrack_integridade_atual.xlsx"
-LOCAL_CSV = DATA_DIR / "xpertrack_integridade_atual.csv"
+LOCAL_XLSX = DATA_DIR / "__sem_coleta_local__.xlsx"
+LOCAL_CSV = DATA_DIR / "__sem_coleta_local__.csv"
+
+# Coleta operacional: único arquivo público mantido manualmente no Google Drive.
+DRIVE_FOLDER_ID = "10mrNHZVlEFUTXRQ5WUH-J50S_e7nl1ui"
+DRIVE_FILE_NAME = "Pelotas.csv"
+DRIVE_FILE_ID_FALLBACK = "1R-aygD6vSDt0YOhOKxY7Di3w7nWdit75"
 REGION_FILE = DATA_DIR / "regioes_nodes.csv"
 MANUAL_CROSSWALK_FILE = DATA_DIR / "cruzamento_manual.csv"
 LOCATION_ANCHOR_FILE = DATA_DIR / "cruzamento_variantes_recuperadas.csv"
@@ -429,6 +434,44 @@ def fetch_remote_bytes(url: str, token: str=""):
     return r.content, r.headers.get("Last-Modified","")
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def fetch_public_drive_collection():
+    """Lê Pelotas.csv da pasta pública.
+
+    Primeiro tenta descobrir o ID atual pelo conteúdo público da pasta, permitindo
+    trocar o arquivo mantendo o mesmo nome. Se o Google mudar o HTML da pasta,
+    usa como fallback o ID do arquivo validado em 23/09/2026.
+    """
+    headers={"User-Agent":"Mozilla/5.0 Painel-Nodes-Pelotas/1.0"}
+    file_id=DRIVE_FILE_ID_FALLBACK
+    folder_url=f"https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}?usp=sharing"
+    try:
+        fr=requests.get(folder_url,headers=headers,timeout=25)
+        fr.raise_for_status()
+        page=fr.text
+        # O HTML público contém o nome e o ID do item. Procura janelas próximas
+        # ao nome para evitar capturar IDs de outros elementos da página.
+        pos=page.lower().find(DRIVE_FILE_NAME.lower())
+        if pos >= 0:
+            window=page[max(0,pos-2500):pos+2500]
+            ids=re.findall(r'([A-Za-z0-9_-]{20,})',window)
+            # IDs de arquivos do Drive costumam aparecer próximos ao nome; testa
+            # candidatos até encontrar um CSV com o cabeçalho esperado.
+            for cand in ids:
+                u=f"https://drive.google.com/uc?export=download&id={cand}"
+                rr=requests.get(u,headers=headers,timeout=20)
+                if rr.ok and b"Node" in rr.content[:500] and (b"Pontua" in rr.content[:500] or b"Pontua" in rr.content[:1000]):
+                    file_id=cand; break
+    except Exception:
+        pass
+    url=f"https://drive.google.com/uc?export=download&id={file_id}"
+    r=requests.get(url,headers=headers,timeout=35)
+    r.raise_for_status()
+    if b"Node" not in r.content[:1000]:
+        raise ValueError("Pelotas.csv não foi localizado/baixado na pasta pública do Drive.")
+    return r.content, r.headers.get("Last-Modified",""), file_id
+
+
 def xpertrack_schema(df: pd.DataFrame):
     by={norm_col(c):c for c in df.columns}
     if "NODE" not in by or "PONTUACAO" not in by: return None
@@ -779,7 +822,7 @@ def _daily_xper_date_name(name:str):
     m=re.search(r"(20\d{2})[-_](\d{2})[-_](\d{2}).*Integridade atual de Node", str(name), flags=re.I)
     if not m: return None
     try:
-        return datetime(int(m.group(1)),int(m.group(2)),int(m.group(3)),12,0,tzinfo=POA_TZ)
+        return datetime(int(m.group(1)),int(m.group(2)),int(m.group(3)),12,0,tzinfo=LOCAL_TZ)
     except Exception:
         return None
 
@@ -861,15 +904,15 @@ ASSIGN_COLUMNS=["Node","Tecnico","Equipe","Prioridade","Ordem","Status","Situaca
 
 
 def load_treatments(): return load_csv_store(TREATMENTS_FILE,github_settings()["treatments"],TREATMENT_COLUMNS)
-def save_treatments(d): return save_csv_store(d,TREATMENTS_FILE,github_settings()["treatments"],TREATMENT_COLUMNS,f"Atualiza tratativas {now_poa():%Y-%m-%d %H:%M}")
+def save_treatments(d): return save_csv_store(d,TREATMENTS_FILE,github_settings()["treatments"],TREATMENT_COLUMNS,f"Atualiza tratativas {now_local():%Y-%m-%d %H:%M}")
 def load_history(): return load_csv_store(HISTORY_FILE,github_settings()["history"],HISTORY_COLUMNS)
-def save_history(d): return save_csv_store(d,HISTORY_FILE,github_settings()["history"],HISTORY_COLUMNS,f"Registra snapshot {now_poa():%Y-%m-%d %H:%M}")
+def save_history(d): return save_csv_store(d,HISTORY_FILE,github_settings()["history"],HISTORY_COLUMNS,f"Registra snapshot {now_local():%Y-%m-%d %H:%M}")
 def load_outages_current(): return load_csv_store(OUTAGES_CURRENT_FILE,github_settings()["outages_current"],OUTAGES_CURRENT_COLUMNS)
-def save_outages_current(d): return save_csv_store(d,OUTAGES_CURRENT_FILE,github_settings()["outages_current"],OUTAGES_CURRENT_COLUMNS,f"Atualiza outages {now_poa():%Y-%m-%d %H:%M}")
+def save_outages_current(d): return save_csv_store(d,OUTAGES_CURRENT_FILE,github_settings()["outages_current"],OUTAGES_CURRENT_COLUMNS,f"Atualiza outages {now_local():%Y-%m-%d %H:%M}")
 def load_team(): return load_csv_store(TEAM_FILE,github_settings()["team"],TEAM_COLUMNS)
-def save_team(d): return save_csv_store(d,TEAM_FILE,github_settings()["team"],TEAM_COLUMNS,f"Atualiza equipe do dia {now_poa():%Y-%m-%d %H:%M}")
+def save_team(d): return save_csv_store(d,TEAM_FILE,github_settings()["team"],TEAM_COLUMNS,f"Atualiza equipe do dia {now_local():%Y-%m-%d %H:%M}")
 def load_assignments(): return load_csv_store(ASSIGNMENTS_FILE,github_settings()["assignments"],ASSIGN_COLUMNS)
-def save_assignments(d): return save_csv_store(d,ASSIGNMENTS_FILE,github_settings()["assignments"],ASSIGN_COLUMNS,f"Atualiza distribuição de nodes {now_poa():%Y-%m-%d %H:%M}")
+def save_assignments(d): return save_csv_store(d,ASSIGNMENTS_FILE,github_settings()["assignments"],ASSIGN_COLUMNS,f"Atualiza distribuição de nodes {now_local():%Y-%m-%d %H:%M}")
 
 
 def save_photo(upload,node,tech):
@@ -877,10 +920,10 @@ def save_photo(upload,node,tech):
     data=upload.getvalue()
     if len(data)>6*1024*1024: return False,"","Foto acima de 6 MB."
     ext=Path(upload.name or "foto.jpg").suffix.lower(); ext=ext if ext in {".jpg",".jpeg",".png",".webp"} else ".jpg"
-    safe_node=re.sub(r"[^A-Z0-9_-]","_",norm_txt(node)); safe_tech=re.sub(r"[^A-Z0-9_-]","_",norm_txt(tech)); name=f"{now_poa():%Y%m%d_%H%M%S}_{safe_node}_{safe_tech}{ext}"
+    safe_node=re.sub(r"[^A-Z0-9_-]","_",norm_txt(node)); safe_tech=re.sub(r"[^A-Z0-9_-]","_",norm_txt(tech)); name=f"{now_local():%Y%m%d_%H%M%S}_{safe_node}_{safe_tech}{ext}"
     gh=github_settings(); path=f"{gh['photos']}/{name}"
     if gh["repo"] and gh["token"]:
-        ok,msg=_gh_write_bytes(path,data,f"Foto atendimento {safe_node} {now_poa():%Y-%m-%d %H:%M}")
+        ok,msg=_gh_write_bytes(path,data,f"Foto atendimento {safe_node} {now_local():%Y-%m-%d %H:%M}")
         return ok,path,msg
     try:
         PHOTO_DIR.mkdir(parents=True,exist_ok=True); (PHOTO_DIR/name).write_bytes(data); return True,f"data/fotos_atendimento/{name}","Foto salva localmente."
@@ -895,7 +938,7 @@ def _daily_xper_date(path: Path):
     if not m:
         return None
     try:
-        return datetime(int(m.group(1)),int(m.group(2)),int(m.group(3)),12,0,tzinfo=POA_TZ)
+        return datetime(int(m.group(1)),int(m.group(2)),int(m.group(3)),12,0,tzinfo=LOCAL_TZ)
     except Exception:
         return None
 
@@ -949,46 +992,22 @@ def find_best_xpertrack_file():
     return chosen,upd
 
 base=load_base(); reg_map=load_region_map()
-remote_url=get_secret("XPERTRACK_DATA_URL","").strip(); remote_token=get_secret("XPERTRACK_BEARER_TOKEN","").strip(); source_name=get_secret("DATA_SOURCE_NAME","XPERTrack").strip() or "XPERTrack"
+source_name="Google Drive • Pelotas.csv"
 xraw=None; source_updated_at=None; source_file_name=""
 
-# No Streamlit Cloud, lê primeiro a pasta data diretamente do GitHub usando o
-# token já configurado. Assim uma nova extração diária passa a valer sem depender
-# de o checkout local do app ter sido reconstruído.
-gh=github_settings()
-if gh["repo"] and gh["token"]:
-    try:
-        gh_raw,gh_name,gh_path,gh_updated=find_best_xpertrack_github()
-        if gh_raw is not None and gh_name:
-            xraw=load_table_bytes(gh_raw,gh_name)
-            source_updated_at=gh_updated
-            source_file_name=gh_name
-    except Exception as e:
-        st.warning(f"Não foi possível ler a extração mais recente diretamente do GitHub: {e}")
-
-# Fonte remota explícita continua disponível como fallback/alternativa.
-if xraw is None and remote_url:
-    try:
-        raw,last_mod=fetch_remote_bytes(remote_url,remote_token); hint=remote_url.split("?")[0].split("/")[-1] or "xpertrack.csv"; xraw=load_table_bytes(raw,hint); source_file_name=hint
-        if last_mod:
-            try: source_updated_at=parsedate_to_datetime(last_mod)
-            except Exception: pass
-    except Exception as e: st.error(f"Falha ao consultar a fonte online do XPERTrack: {e}")
-
-# Local permanece como fallback para execução no PC e para ambientes sem token GitHub.
-if xraw is None:
-    local,detected_updated_at=find_best_xpertrack_file()
-    if local:
-        try:
-            xraw=load_table_bytes(local.read_bytes(),local.name); source_file_name=local.name
-            gh_xper_path=get_secret("XPERTRACK_GITHUB_PATH",f"data/{local.name}").strip() or f"data/{local.name}"
-            if get_secret("XPERTRACK_GITHUB_PATH","").strip():
-                source_updated_at=github_file_updated_at(gh_xper_path) or detected_updated_at
-            else:
-                source_updated_at=detected_updated_at or github_file_updated_at(f"data/{local.name}")
-            if source_updated_at is None:
-                source_updated_at=datetime.fromtimestamp(local.stat().st_mtime,tz=timezone.utc)
-        except Exception as e: st.error(f"Não consegui abrir {local.name}: {e}")
+# Pelotas segue o mesmo fluxo operacional validado: a base geográfica fica no
+# GitHub e somente a coleta XPERTrack é substituída manualmente no Drive.
+try:
+    raw,last_mod,drive_file_id=fetch_public_drive_collection()
+    xraw=load_table_bytes(raw,DRIVE_FILE_NAME)
+    source_file_name=DRIVE_FILE_NAME
+    if last_mod:
+        try: source_updated_at=parsedate_to_datetime(last_mod)
+        except Exception: pass
+    if source_updated_at is None:
+        source_updated_at=now_local()
+except Exception as e:
+    st.error(f"Não foi possível carregar {DRIVE_FILE_NAME} da pasta pública do Google Drive: {e}")
 
 status_df=pd.DataFrame(); xnorm=pd.DataFrame()
 if xraw is not None and not xraw.empty and xpertrack_schema(xraw):
@@ -1145,12 +1164,12 @@ def _source_fingerprint():
 
 def _source_local_datetime():
     if source_updated_at is None:
-        return now_poa()
+        return now_local()
     try:
         dt=source_updated_at if source_updated_at.tzinfo else source_updated_at.replace(tzinfo=timezone.utc)
-        return dt.astimezone(POA_TZ)
+        return dt.astimezone(LOCAL_TZ)
     except Exception:
-        return now_poa()
+        return now_local()
 
 
 def _snapshot_row(datahora, outages_value, tipo, source_key="", observacao=""):
@@ -1178,15 +1197,15 @@ def _history_datetime_local(row):
     if "SAO_PAULO" in fuso or "AMERICA/SAO_PAULO" in str(row.get("Fuso","")).upper():
         return ts.tz_localize(None) if ts.tzinfo else ts
     if ts.tzinfo is not None:
-        try: return ts.tz_convert(POA_TZ).tz_localize(None)
+        try: return ts.tz_convert(LOCAL_TZ).tz_localize(None)
         except Exception: return ts.tz_localize(None)
     event_date=pd.to_datetime(row.get("Evento"),errors="coerce")
-    now_local=pd.Timestamp(now_poa().replace(tzinfo=None))
+    now_local=pd.Timestamp(now_local().replace(tzinfo=None))
     looks_utc=False
     if pd.notna(event_date) and ts.date()>event_date.date(): looks_utc=True
     if ts>now_local+pd.Timedelta(minutes=10): looks_utc=True
     if looks_utc:
-        try: return ts.tz_localize("UTC").tz_convert(POA_TZ).tz_localize(None)
+        try: return ts.tz_localize("UTC").tz_convert(LOCAL_TZ).tz_localize(None)
         except Exception: return ts-pd.Timedelta(hours=3)
     return ts
 
@@ -1228,7 +1247,7 @@ if mapping_ready and source_key:
 if not history_df.empty:
     history_df["DataHora_dt"]=history_df.apply(_history_datetime_local,axis=1)
     history_df=history_df.sort_values("DataHora_dt",na_position="last").reset_index(drop=True)
-    today=now_poa().date()
+    today=now_local().date()
     local_dates=history_df["DataHora_dt"].map(lambda v:v.date() if pd.notna(v) else None)
     event_history=history_df[local_dates.eq(today)].copy()
     current_event=today.isoformat()
@@ -1245,7 +1264,7 @@ if not history_df.empty:
         if len(keep): keep.iloc[0]=True
         event_history=event_history.loc[keep].drop(columns=["_off_num","_out_num"],errors="ignore").reset_index(drop=True)
 else:
-    current_event=now_poa().date().isoformat(); event_history=pd.DataFrame(columns=HISTORY_COLUMNS+["DataHora_dt"])
+    current_event=now_local().date().isoformat(); event_history=pd.DataFrame(columns=HISTORY_COLUMNS+["DataHora_dt"])
 
 # Fallback apenas para históricos antigos, antes da criação do arquivo outages_atual.csv.
 if outages_current is None and not event_history.empty:
@@ -1300,7 +1319,7 @@ def source_age_minutes(dt):
     except Exception: return None
 age_min=source_age_minutes(source_updated_at); stale_after=int(CFG.get("stale_after_minutes",90) or 90); is_stale=age_min is not None and age_min>stale_after
 if source_updated_at:
-    try: updated_txt=source_updated_at.astimezone(POA_TZ).strftime("%d/%m/%Y %H:%M")
+    try: updated_txt=source_updated_at.astimezone(LOCAL_TZ).strftime("%d/%m/%Y %H:%M")
     except Exception: updated_txt=source_updated_at.strftime("%d/%m/%Y %H:%M")
 else: updated_txt="sem horário da fonte"
 
@@ -1363,7 +1382,7 @@ def render_operational_update_dialog():
         obs_out=st.text_input("Observação (opcional)",key="outages_note_dialog")
         save_out=st.form_submit_button("💾 Registrar outages",use_container_width=True)
     if save_out:
-        now=now_poa()
+        now=now_local()
         current_row=pd.DataFrame([{"Outages_Sem_Sinal":int(outages_input),"DataHora":now.strftime("%Y-%m-%d %H:%M"),"Fuso":"America/Sao_Paulo","Observacao":obs_out.strip()}])
         ok_current,msg_current=save_outages_current(current_row)
         if not ok_current:
@@ -1397,7 +1416,7 @@ def render_operational_update_dialog():
         observacao=st.text_area("Observação",value=str(current_rec.get("Observacao","") if current_rec is not None else ""),height=80)
         save_node=st.form_submit_button("💾 Salvar informação do node",use_container_width=True,disabled=not selected_node)
     if save_node and selected_node:
-        all_t=load_treatments(); now=now_poa().strftime("%d/%m/%Y %H:%M")
+        all_t=load_treatments(); now=now_local().strftime("%d/%m/%Y %H:%M")
         new_row={"Node":norm_txt(selected_node),"Tratativa":norm_txt(trat),"Situacao":situacao.strip(),"Observacao":observacao.strip(),"Responsavel":responsavel.strip(),"Atualizado_em":now,"Status_tecnico_no_registro":norm_txt(trat)}
         all_t=pd.concat([all_t,pd.DataFrame([new_row])],ignore_index=True)
         ok,msg=save_treatments(all_t)
@@ -1431,7 +1450,7 @@ def tech_users():
 
 def check_tech_access():
     if request_is_local():
-        team=load_team(); today=now_poa().strftime("%Y-%m-%d"); t=team[(team["Data"].astype(str)==today)&(team["Ativo"].astype(str).str.upper().isin(["TRUE","1","SIM","YES"]))]
+        team=load_team(); today=now_local().strftime("%Y-%m-%d"); t=team[(team["Data"].astype(str)==today)&(team["Ativo"].astype(str).str.upper().isin(["TRUE","1","SIM","YES"]))]
         choices=sorted(t["Tecnico"].map(norm_txt).dropna().unique().tolist())
         if not choices: st.info("Cadastre a Equipe do dia na Visão Supervisor."); return None
         return st.selectbox("Técnico (teste local)",choices)
@@ -1789,7 +1808,7 @@ if view=="Executiva":
     render_map_search(); render_legend(); render_map(height=650)
     if crisis_mode: st.error(f"⚡ MODO CRISE ATIVO — {fmt_int(ports_off or 0)} portas OFF.")
 
-    st.markdown('<div class="footer-version" style="text-align:center;color:#7a879c;font-size:10px;margin-top:12px">v10.1.4</div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer-version" style="text-align:center;color:#7a879c;font-size:10px;margin-top:12px">v10.2 • Pelotas Drive</div>', unsafe_allow_html=True)
 
 # -----------------------------
 # VISÃO SUPERVISOR
@@ -1810,12 +1829,12 @@ elif view=="Supervisor":
     c1,c2=st.columns([1.35,1])
     with c1:
         st.markdown("### 👥 Equipe do dia")
-        team=load_team(); today=now_poa().strftime("%Y-%m-%d"); current=team[team["Data"].astype(str)==today].copy()
+        team=load_team(); today=now_local().strftime("%Y-%m-%d"); current=team[team["Data"].astype(str)==today].copy()
         if current.empty: current=pd.DataFrame([{"Data":today,"Tecnico":"","Equipe":"","Turno":"","Regiao_Preferencial":"","Ativo":True,"Atualizado_em":""}])
         edit=current[["Tecnico","Equipe","Turno","Regiao_Preferencial","Ativo"]].copy(); edit["Ativo"]=edit["Ativo"].astype(str).str.upper().map({"TRUE":True,"1":True,"SIM":True,"YES":True,"FALSE":False,"0":False,"NAO":False,"NÃO":False}).fillna(True)
         edited=st.data_editor(edit,num_rows="dynamic",use_container_width=True,hide_index=True,column_config={"Ativo":st.column_config.CheckboxColumn("Ativo")},key="team_editor")
         if st.button("💾 Salvar equipe do dia",use_container_width=True):
-            keep=team[team["Data"].astype(str)!=today].copy(); new=edited.copy(); new["Data"]=today; new["Tecnico"]=new["Tecnico"].map(norm_txt); new["Equipe"]=new["Equipe"].map(norm_txt); new["Turno"]=new["Turno"].map(norm_txt); new["Regiao_Preferencial"]=new["Regiao_Preferencial"].map(norm_txt); new["Atualizado_em"]=now_poa().strftime("%d/%m/%Y %H:%M"); new=new[new["Tecnico"].astype(str).str.len()>0]; ok,msg=save_team(pd.concat([keep,new],ignore_index=True)); st.success(msg) if ok else st.error(msg); st.rerun() if ok else None
+            keep=team[team["Data"].astype(str)!=today].copy(); new=edited.copy(); new["Data"]=today; new["Tecnico"]=new["Tecnico"].map(norm_txt); new["Equipe"]=new["Equipe"].map(norm_txt); new["Turno"]=new["Turno"].map(norm_txt); new["Regiao_Preferencial"]=new["Regiao_Preferencial"].map(norm_txt); new["Atualizado_em"]=now_local().strftime("%d/%m/%Y %H:%M"); new=new[new["Tecnico"].astype(str).str.len()>0]; ok,msg=save_team(pd.concat([keep,new],ignore_index=True)); st.success(msg) if ok else st.error(msg); st.rerun() if ok else None
     with c2:
         st.markdown("### 📌 Resumo de despacho")
         active=assignments_latest[~assignments_latest["Status"].map(norm_txt).isin(["NORMALIZADO","CANCELADO"])] if not assignments_latest.empty else assignments_latest
@@ -1833,7 +1852,7 @@ elif view=="Supervisor":
             options=sug["Node"].tolist()+[n for n in logical[(logical["Portas_OFF"]>0)&(logical["Tratativa"].map(norm_txt)=="SEM TRATATIVA")]["Node"].tolist() if n not in set(sug["Node"])]
             selected=st.multiselect("Nodes para atribuir",options,default=options[:1] if options else [])
             if st.button("➡️ Atribuir ao técnico",use_container_width=True,disabled=not selected):
-                all_a=load_assignments(); eqrow=team_today[team_today["Tecnico"].map(norm_txt)==norm_txt(tech)]; equipe=norm_txt(eqrow.iloc[0]["Equipe"]) if not eqrow.empty else ""; now=now_poa().strftime("%d/%m/%Y %H:%M"); out=all_a.copy()
+                all_a=load_assignments(); eqrow=team_today[team_today["Tecnico"].map(norm_txt)==norm_txt(tech)]; equipe=norm_txt(eqrow.iloc[0]["Equipe"]) if not eqrow.empty else ""; now=now_local().strftime("%d/%m/%Y %H:%M"); out=all_a.copy()
                 for order,node in enumerate(selected,1):
                     out=out[out["Node"].map(norm_txt)!=norm_txt(node)].copy(); rr=logical[logical["Node"]==norm_txt(node)]; pri=int(node_priority_score(rr.iloc[0])) if not rr.empty else 0; out=pd.concat([out,pd.DataFrame([{"Node":norm_txt(node),"Tecnico":norm_txt(tech),"Equipe":equipe,"Prioridade":pri,"Ordem":order,"Status":"ATRIBUÍDO","Situacao":"ATRIBUÍDO","Observacao":"","Atribuido_em":now,"Atualizado_em":now,"Foto_Path":""}])],ignore_index=True)
                 ok,msg=save_assignments(out); st.success(msg) if ok else st.error(msg); st.rerun() if ok else None
@@ -1854,7 +1873,7 @@ elif view=="Supervisor":
         with st.form("snapshot_form"):
             outages_input=st.number_input("Outages sem sinal",min_value=0,step=1,value=int(outages_current or 0)); obs=st.text_input("Observação (opcional)"); save=st.form_submit_button("💾 Registrar atualização",use_container_width=True)
         if save:
-            now=now_poa(); row=_snapshot_row(now,int(outages_input),"MANUAL",source_key,obs.strip()); hd=history_df.drop(columns=["DataHora_dt"],errors="ignore") if not history_df.empty else pd.DataFrame(columns=HISTORY_COLUMNS); hd=pd.concat([hd,pd.DataFrame([row])],ignore_index=True); ok,msg=save_history(hd); st.success(msg) if ok else st.error(msg); st.rerun() if ok else None
+            now=now_local(); row=_snapshot_row(now,int(outages_input),"MANUAL",source_key,obs.strip()); hd=history_df.drop(columns=["DataHora_dt"],errors="ignore") if not history_df.empty else pd.DataFrame(columns=HISTORY_COLUMNS); hd=pd.concat([hd,pd.DataFrame([row])],ignore_index=True); ok,msg=save_history(hd); st.success(msg) if ok else st.error(msg); st.rerun() if ok else None
 
 # -----------------------------
 # VISÃO TÉCNICO
@@ -1887,4 +1906,4 @@ else:
             okp,pth,msgp=save_photo(photo,selected,technician)
             if not okp: st.error(msgp); st.stop()
             photo_path=pth
-        all_a=load_assignments(); mask=all_a["Node"].map(norm_txt)==norm_txt(selected); base_row=cur.to_dict(); base_row.update({"Node":norm_txt(selected),"Tecnico":norm_txt(technician),"Status":status,"Situacao":status,"Observacao":obs.strip(),"Atualizado_em":now_poa().strftime("%d/%m/%Y %H:%M"),"Foto_Path":photo_path}); all_a=all_a[~mask].copy(); all_a=pd.concat([all_a,pd.DataFrame([base_row])],ignore_index=True); ok,msg=save_assignments(all_a); st.success("Atendimento atualizado.") if ok else st.error(msg); st.rerun() if ok else None
+        all_a=load_assignments(); mask=all_a["Node"].map(norm_txt)==norm_txt(selected); base_row=cur.to_dict(); base_row.update({"Node":norm_txt(selected),"Tecnico":norm_txt(technician),"Status":status,"Situacao":status,"Observacao":obs.strip(),"Atualizado_em":now_local().strftime("%d/%m/%Y %H:%M"),"Foto_Path":photo_path}); all_a=all_a[~mask].copy(); all_a=pd.concat([all_a,pd.DataFrame([base_row])],ignore_index=True); ok,msg=save_assignments(all_a); st.success("Atendimento atualizado.") if ok else st.error(msg); st.rerun() if ok else None
