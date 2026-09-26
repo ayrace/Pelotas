@@ -1471,16 +1471,31 @@ def check_tech_access():
 # -----------------------------
 def render_kpis():
     off_sub=(f"{mapped_ports_off} localizadas" + (f" • {ports_off_unmapped} sem localização" if ports_off_unmapped else "")) if ports_off is not None else "aguardando XPERTrack"
-    outages_action='<a class="kpi-action" href="?atualizar=operacional" target="_self">Atualizar</a>'
+
+    # Mesmo padrão operacional adotado em Rio Grande:
+    # o comando de atualização fica fora do card e permanece sempre acessível.
+    st.markdown(
+        '<div style="display:flex;justify-content:flex-end;margin:0 0 8px 0">'
+        '<a class="kpi-action" href="?atualizar=operacional" target="_self" '
+        'style="text-decoration:none;padding:7px 12px;border-radius:9px">↻ Atualizar outages</a>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     cards=[
         kpi_html("Portas OFF",fmt_int(ports_off),off_sub,"kpi-red"),
-        kpi_html("Outages sem sinal",fmt_int(outages_current) if outages_current is not None else "—",outages_action,"kpi-blue",sub_is_html=True),
         kpi_html("Sem sinal total",fmt_int(off_total),"todas as portas existentes OFF","kpi-red"),
         kpi_html("Sem sinal parcial",fmt_int(parcial),"1 ou mais portas OFF, sem perda total","kpi-yellow"),
         kpi_html("Portas críticas",fmt_int(ports_critical),"pontuação de 1 a 20","kpi-yellow"),
         kpi_html("Região mais impactada",region_label,f"{region_pct:.1f}% das portas OFF","kpi-blue"),
         kpi_html("Bairro mais impactado",bairro_label,f"{bairro_off} portas OFF","kpi-blue"),
     ]
+
+    # Sem outages ativos, não ocupa espaço com um card zerado.
+    # Quando houver 1 ou mais, o card volta automaticamente ao painel.
+    if outages_current is not None and int(outages_current) > 0:
+        cards.insert(1,kpi_html("Outages sem sinal",fmt_int(outages_current),"outages ativos","kpi-blue"))
+
     st.markdown('<div class="kpi-grid">'+''.join(cards)+'</div>',unsafe_allow_html=True)
 
 
@@ -1810,7 +1825,7 @@ if view=="Executiva":
     render_map_search(); render_legend(); render_map(height=650)
     if crisis_mode: st.error(f"⚡ MODO CRISE ATIVO — {fmt_int(ports_off or 0)} portas OFF.")
 
-    st.markdown('<div class="footer-version" style="text-align:center;color:#7a879c;font-size:10px;margin-top:12px">PEL V9 • Drive no-cache</div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer-version" style="text-align:center;color:#7a879c;font-size:10px;margin-top:12px">PEL V10 • Outages + Drive no-cache</div>', unsafe_allow_html=True)
 
 # -----------------------------
 # VISÃO SUPERVISOR
